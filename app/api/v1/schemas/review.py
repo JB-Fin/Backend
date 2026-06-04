@@ -1,25 +1,36 @@
-from typing import List
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel
 
-class ReviewAnalyzeRequest(BaseModel):
-    filename: str
-    language: str = "ko"
 
-class RiskComment(BaseModel):
-    title: str
-    category: str
-    related_rule: str
-    description: str
+class ReviewAnalyzeRequest(BaseModel):
+    file_id: int
+    language: str = "ko"
+    regulation_scope: str = "internal_external"
+
+
+class HighlightItem(BaseModel):
+    page: Optional[int] = None
+    original_text: str
+    issue: str
     suggestion: str
-    status: str
+    risk_level: str
+
 
 class ReviewAnalyzeResponse(BaseModel):
     review_id: int
-    filename: str
-    language: str
+    file_id: int
+    file_name: Optional[str] = None
     status: str
-    issue_count: int
-    suggestion_count: int
-    original_text: List[str]
-    revised_text: List[str]
-    comments: List[RiskComment]
+    language: str
+    regulation_scope: Optional[str] = None
+    summary: str
+    risk_level: str
+    highlights: list[HighlightItem]
+    created_at: datetime
+    report_files: dict[str, str] = {}
+
+
+class ReviewDetailResponse(ReviewAnalyzeResponse):
+    pass
