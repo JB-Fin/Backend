@@ -1,12 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
-from app.api.v1.schemas.auth import LoginRequest, LoginResponse
+from app.api.v1.schemas.auth import LoginRequest, LoginResponse, LogoutResponse
 
 router = APIRouter()
 
-@router.post(
-    "/login", 
-    response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse)
 
 def login(request: LoginRequest):
     if (
@@ -14,7 +12,7 @@ def login(request: LoginRequest):
         or request.password != "1234"
     ):
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="아이디 또는 비밀번호가 잘못되었습니다."
         )
     return {
@@ -28,8 +26,10 @@ def login(request: LoginRequest):
         },
     }
 
-@router.post("/logout")
+@router.post("/logout", response_model=LogoutResponse)
 def logout():
+    # JWT 기반이면 클라이언트에서 토큰 삭제.
+    # 서버 세션/블랙리스트 방식이면 여기서 토큰 무효화 처리.
     return {
         "message": "로그아웃 완료"
     }
