@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 
 from app.api.v1.schemas.review import (
@@ -38,20 +38,25 @@ def get_highlights(review_id: int):
     return get_review_highlights(review_id)
 
 @router.get("/{review_id}/report")
-def download_review_report(review_id: int, format: str = "pdf"):
+def download_review_report(
+    review_id: int,
+    file_format: str = Query(default="pdf", alias="format"),
+):
+    file_format = file_format.lower()
+
     report_path = get_review_report_path(
         review_id=review_id,
-        file_format=format,
+        file_format=file_format,
     )
 
     media_types = {
         "pdf": "application/pdf",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "txt": "text/plain",
+        "txt": "text/plain; charset=utf-8",
     }
 
     return FileResponse(
         path=report_path,
         filename=report_path.name,
-        media_type=media_types.get(format, "application/octet-stream"),
+        media_type=media_types.get(file_format, "application/octet-stream"),
     )

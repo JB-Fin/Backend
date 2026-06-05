@@ -8,7 +8,6 @@ from app.services.regulation_service import search_regulations
 
 router = APIRouter()
 
-
 @router.post("/search", response_model=RegulationSearchResponse)
 def search(request: RegulationSearchRequest):
     return search_regulations(
