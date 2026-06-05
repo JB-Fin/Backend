@@ -5,7 +5,6 @@ from app.api.v1.schemas.auth import LoginRequest, LoginResponse, LogoutResponse
 router = APIRouter()
 
 @router.post("/login", response_model=LoginResponse)
-
 def login(request: LoginRequest):
     if (
         request.user_id != "admin"
