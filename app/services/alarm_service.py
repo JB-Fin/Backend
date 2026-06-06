@@ -1,11 +1,17 @@
-from datetime import datetime
-from fastapi import HTTPException
+from datetime import datetime, timezone
+from fastapi import HTTPException, status
 
 ALARMS_DB = []
 ALARM_ID_SEQ = 1
 
 def create_alarm(title: str, message: str | None, alarm_time, review_id: int | None):
     global ALARM_ID_SEQ
+
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="알람 제목은 필수입니다.",
+        )
 
     alarm = {
         "alarm_id": ALARM_ID_SEQ,
@@ -14,7 +20,7 @@ def create_alarm(title: str, message: str | None, alarm_time, review_id: int | N
         "alarm_time": alarm_time,
         "review_id": review_id,
         "is_done": False,
-        "created_at": datetime.now(),
+        "created_at": datetime.now(tz=timezone.utc),
     }
 
     ALARMS_DB.append(alarm)
@@ -30,10 +36,19 @@ def get_alarm_by_id(alarm_id: int):
         if alarm["alarm_id"] == alarm_id:
             return alarm
 
-    raise HTTPException(status_code=404, detail="알람을 찾을 수 없습니다.")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="알람을 찾을 수 없습니다.",
+    )
 
 def update_alarm(alarm_id: int, update_data: dict):
     alarm = get_alarm_by_id(alarm_id)
+  
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="수정할 알람 정보가 없습니다.",
+        )
 
     for key, value in update_data.items():
         if value is not None:

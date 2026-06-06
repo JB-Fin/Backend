@@ -1,30 +1,49 @@
+from fastapi import HTTPException, status
+
+from app.services.regulation_service import search_regulations
+from app.agents.chat_agent import generate_chat_answer
+
 def answer_question(question: str, language: str) -> dict:
-    """
-    사용자 질문에 답변을 반환합니다.
-    현재는 stub 상태입니다. OpenAI 연동 시 아래 주석을 해제하세요.
-    """
-    
-    # from openai import OpenAI
-    # import os
-    #
-    # client = OpenAI()
-    # MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    #
-    # response = client.chat.completions.create(
-    #     model=MODEL_NAME,
-    #     messages=[
-    #         {
-    #             "role": "system",
-    #             "content": f"You are a legal compliance assistant. Respond in {language}.",
-    #         },
-    #         {
-    #             "role": "user",
-    #             "content": question,
-    #         },
-    #     ],
+
+    if not question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="질문을 입력해주세요.",
+        )
+
+    regulation_result = search_regulations(
+        query=question,
+        language=language,
+        top_k=6,
+    )
+
+    # return generate_chat_answer(
+    #     question=question,                         
+    #     language=language,
+    #     regulations=regulation_result["results"],
     # )
-    #
-    # return {"answer": response.choices[0].message.content}
+
+    regulations = regulation_result["results"]
+
+    # context,  sources 부분들은 Agent 코드 구현 이후 빼야함
+    sources = [
+        item["title"]
+        for item in regulations
+    ]
+
+    context = "\n\n".join(
+        [
+            f"[{item['regulation_id']}] {item['title']}\n{item['content']}"
+            for item in regulations
+        ]
+    )
 
     # 임시 stub 응답
-    return {"answer": f"'{question}'에 대한 답변 기능은 준비 중입니다."}
+    return {
+        "answer": (
+            f"질문: {question}\n\n"
+            f"아래 규정을 참고하여 답변합니다.\n\n"
+            f"{context}"
+        ),
+        "sources": sources,
+    }
