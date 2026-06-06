@@ -1,15 +1,22 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter()
 
 @router.get("")
 def get_languages():
-    return {
-        "languages": [
-            {"code": "ko", "name": "한국어(Korean)"},
-            {"code": "en", "name": "English(영어)"},
-            {"code": "ja", "name": "ភាសាខ្មែរ(캄도디아어)"},
-            {"code": "zh", "name": "Tiếng Việt(베트남어)"},
-            {"code": "es", "name": "မြန်မာဘာသာ(미얀마어)"},
-        ]
-    }
+    try:
+        return {
+            "languages": [
+                {"code": "ko", "name": "한국어(Korean)"},
+                {"code": "en", "name": "English(영어)"},
+                {"code": "km", "name": "ភាសាខ្មែរ(캄보디아어)"},
+                {"code": "vi", "name": "Tiếng Việt(베트남어)"},
+                {"code": "my", "name": "မြန်မာဘာသာ(미얀마어)"},
+            ]
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"언어 목록 조회 중 오류가 발생했습니다: {str(e)}",
+        )

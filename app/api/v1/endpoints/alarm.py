@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.v1.schemas.alarm import (
     AlarmCreateRequest,
@@ -16,24 +16,48 @@ router = APIRouter()
 
 @router.post("", response_model=AlarmResponse)
 def create_new_alarm(request: AlarmCreateRequest):
-    return create_alarm(
-        title=request.title,
-        message=request.message,
-        alarm_time=request.alarm_time,
-        review_id=request.review_id,
-    )
+    try:
+        return create_alarm(
+            title=request.title,
+            message=request.message,
+            alarm_time=request.alarm_time,
+            review_id=request.review_id,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알람 생성 중 오류가 발생했습니다: {str(e)}",
+        )
 
 @router.get("", response_model=list[AlarmResponse])
 def list_alarms():
-    return get_alarms()
+    try:
+        return get_alarms()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알람 목록 조회 중 오류가 발생했습니다: {str(e)}",
+        )
 
 @router.patch("/{alarm_id}", response_model=AlarmResponse)
 def patch_alarm(alarm_id: int, request: AlarmUpdateRequest):
-    return update_alarm(
-        alarm_id=alarm_id,
-        update_data=request.model_dump(exclude_unset=True),
-    )
+    try:
+        return update_alarm(
+            alarm_id=alarm_id,
+            update_data=request.model_dump(exclude_unset=True),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"알람 수정 실패: {str(e)}",
+        )
 
 @router.delete("/{alarm_id}")
 def remove_alarm(alarm_id: int):
-    return delete_alarm(alarm_id)
+    try:
+        return delete_alarm(alarm_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"알람 삭제 실패: {str(e)}",
+        )

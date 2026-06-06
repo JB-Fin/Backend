@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+import json
 
 from docx import Document
 from reportlab.lib.pagesizes import A4
@@ -9,6 +10,19 @@ from reportlab.pdfgen import canvas
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+def format_summary(summary: dict) -> str:
+    if not isinstance(summary, dict):
+        return str(summary)
+
+    total_issues = summary.get("total_issues", 0)
+    issue_counts = summary.get("issue_summary_counts", {})
+
+    lines = [f"총 이슈 수: {total_issues}"]
+
+    for issue, count in issue_counts.items():
+        lines.append(f"- {issue}: {count}건")
+
+    return "\n".join(lines)
 
 def create_txt_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.txt"
@@ -20,10 +34,11 @@ def create_txt_report(review: dict) -> Path:
         highlights_text += f"""
 {idx}. 수정 필요 사항
 - 페이지: {item.get("page", "-")}
-- 위험도: {item.get("risk_level", "-")}
 - 원문: {item.get("original_text", "-")}
-- 이슈: {item.get("issue", "-")}
-- 제안: {item.get("suggestion", "-")}
+- 이슈: {item.get("issue_summary", "-")}
+- 근거: {item.get("reason", "-")}
+- 수정 제안: {item.get("suggested_text", "-")}
+- 수정 설명: {item.get("revision_detail", "-")}
 """
 
     report_path.write_text(
@@ -35,10 +50,9 @@ def create_txt_report(review: dict) -> Path:
 파일명: {review.get("file_name", "-")}
 검토 언어: {review.get("language")}
 규정 범위: {review.get("regulation_scope", "-")}
-위험도: {review.get("risk_level")}
 
 [요약]
-{review.get("summary")}
+{format_summary(review.get("summary", {}))}
 
 [수정 필요 사항]
 {highlights_text}
@@ -47,7 +61,6 @@ def create_txt_report(review: dict) -> Path:
     )
 
     return report_path
-
 
 def create_docx_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.docx"
@@ -62,10 +75,9 @@ def create_docx_report(review: dict) -> Path:
     doc.add_paragraph(f"파일명: {review.get('file_name', '-')}")
     doc.add_paragraph(f"검토 언어: {review.get('language')}")
     doc.add_paragraph(f"규정 범위: {review.get('regulation_scope', '-')}")
-    doc.add_paragraph(f"위험도: {review.get('risk_level')}")
 
     doc.add_heading("1. 검토 요약", level=1)
-    doc.add_paragraph(review.get("summary", "-"))
+    doc.add_paragraph(format_summary(review.get("summary", {})))
 
     doc.add_heading("2. 수정 필요 사항", level=1)
 
@@ -79,18 +91,18 @@ def create_docx_report(review: dict) -> Path:
 
         header_cells = table.rows[0].cells
         header_cells[0].text = "페이지"
-        header_cells[1].text = "위험도"
-        header_cells[2].text = "원문"
-        header_cells[3].text = "이슈"
+        header_cells[1].text = "원문"
+        header_cells[2].text = "이슈"
+        header_cells[3].text = "근거"
         header_cells[4].text = "수정 제안"
 
         for item in highlights:
             row_cells = table.add_row().cells
             row_cells[0].text = str(item.get("page", "-"))
-            row_cells[1].text = item.get("risk_level", "-")
-            row_cells[2].text = item.get("original_text", "-")
-            row_cells[3].text = item.get("issue", "-")
-            row_cells[4].text = item.get("suggestion", "-")
+            row_cells[1].text = item.get("original_text", "-")
+            row_cells[2].text = item.get("issue_summary", "-")
+            row_cells[3].text = item.get("reason", "-")
+            row_cells[4].text = item.get("suggested_text", "-")
 
     doc.add_heading("3. 종합 의견", level=1)
     doc.add_paragraph(
@@ -101,7 +113,6 @@ def create_docx_report(review: dict) -> Path:
     doc.save(report_path)
 
     return report_path
-
 
 def create_pdf_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.pdf"
@@ -130,8 +141,6 @@ def create_pdf_report(review: dict) -> Path:
     c.drawString(x, y, f"Language: {review.get('language')}")
     y -= 20
     c.drawString(x, y, f"Regulation Scope: {review.get('regulation_scope', '-')}")
-    y -= 20
-    c.drawString(x, y, f"Risk Level: {review.get('risk_level')}")
 
     y -= 35
     c.setFont("Helvetica-Bold", 13)
@@ -139,8 +148,8 @@ def create_pdf_report(review: dict) -> Path:
 
     y -= 20
     c.setFont("Helvetica", 10)
-    summary = review.get("summary", "-")
-    c.drawString(x, y, summary[:90])
+    summary_text = format_summary(review.get("summary", {}))
+    c.drawString(x, y, summary_text[:90])
 
     y -= 35
     c.setFont("Helvetica-Bold", 13)
@@ -155,19 +164,18 @@ def create_pdf_report(review: dict) -> Path:
             y = height - 50
             c.setFont("Helvetica", 9)
 
-        c.drawString(x, y, f"{idx}. Risk: {item.get('risk_level', '-')}")
+        c.drawString(x, y, f"{idx}. Page: {item.get('page', '-')}")
         y -= 15
         c.drawString(x, y, f"Original: {item.get('original_text', '-')[:90]}")
         y -= 15
-        c.drawString(x, y, f"Issue: {item.get('issue', '-')[:90]}")
+        c.drawString(x, y, f"Issue: {item.get('issue_summary', '-')[:90]}")
         y -= 15
-        c.drawString(x, y, f"Suggestion: {item.get('suggestion', '-')[:90]}")
+        c.drawString(x, y, f"Suggestion: {item.get('suggested_text', '-')[:90]}")
         y -= 25
 
     c.save()
 
     return report_path
-
 
 def create_reports(review: dict) -> dict:
     txt_path = create_txt_report(review)
