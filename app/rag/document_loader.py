@@ -99,3 +99,12 @@ def load_file(file_path: str) -> List[LCDocument]:
         return read_txt(file_path)
 
     raise ValueError(f"지원하지 않는 파일 형식입니다: {ext}")
+
+def load_target_document(file_path: str) -> str:
+    docs = load_file(file_path)
+
+    return "\n\n".join(
+        doc.page_content
+        for doc in docs
+        if doc.page_content and doc.page_content.strip()
+    )

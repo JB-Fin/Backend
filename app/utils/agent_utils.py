@@ -93,3 +93,38 @@ def compact_evidence(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         )
 
     return compacted
+
+def clean_json_response(text):
+
+    text = text.strip()
+
+    text = re.sub(
+        r"^```json",
+        "",
+        text,
+    )
+
+    text = re.sub(
+        r"^```",
+        "",
+        text,
+    )
+
+    text = re.sub(
+        r"```$",
+        "",
+        text,
+    )
+
+    return text.strip()
+
+
+def safe_json_loads(text):
+
+    try:
+        return json.loads(
+            clean_json_response(text)
+        )
+
+    except Exception:
+        return []

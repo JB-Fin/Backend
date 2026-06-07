@@ -7,3 +7,4 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[str] = []
+    review_points: list[str] = []

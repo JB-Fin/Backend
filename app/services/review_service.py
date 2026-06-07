@@ -133,6 +133,7 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
             "summary": report.get("summary", {}),
             "highlights": state.get("revised_issues", []),
             "report": report,
+            "revised_document": state.get("revised_document", ""),
             "created_at": datetime.now(tz=timezone.utc),
             "document_info": state.get("document_info", {}),
             "report_files": {},
