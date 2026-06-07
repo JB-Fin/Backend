@@ -1,3 +1,11 @@
+from pathlib import Path
+from typing import List
+
+import fitz
+
+from docx import Document as DocxDocument
+from langchain_core.documents import Document as LCDocument
+
 def read_pdf(file_path: str) -> List[LCDocument]:
     docs = []
     path = Path(file_path)

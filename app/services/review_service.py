@@ -7,16 +7,17 @@ from fastapi import HTTPException,status
 
 from app.services.file_service import get_file_by_id
 from app.services.report_service import create_reports
-# from app.graphs.review_graph import build_review_graph
 from app.graphs.review_graph import review_graph
-
-from app.agents.report_agent import run_report_agent
 from app.rag.document_loader import load_file
+from app.rag.vector_store import build_vectorstore
 
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+REGULATION_DIR = Path("regulations")
+
 SUPPORTED_REPORT_FORMATS = {"pdf", "docx", "txt"}
+SUPPORTED_REGULATION_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 REVIEWS_DB = []
 
@@ -52,6 +53,29 @@ def extract_text_from_file(file_info: dict) -> str:
 
     return document_text
 
+def get_regulation_paths() -> list[str]:
+    if not REGULATION_DIR.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="regulations 폴더가 없습니다. 프로젝트 루트에 regulations 폴더를 생성하세요.",
+        )
+
+    regulation_paths = [
+        str(file_path)
+        for file_path in REGULATION_DIR.iterdir()
+        if file_path.is_file()
+        and file_path.suffix.lower() in SUPPORTED_REGULATION_EXTENSIONS
+    ]
+
+    if not regulation_paths:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="regulations 폴더에 규정 문서가 없습니다. pdf, docx, txt 파일을 추가하세요.",
+        )
+
+    return regulation_paths
+
+
 def analyze_review(file_id: int, language: str, regulation_scope: str):
     try:
         file_info = get_file_by_id(file_id)
@@ -66,12 +90,30 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
 
         document_text = extract_text_from_file(file_info)
 
+        regulation_paths = get_regulation_paths()
+        
+        vectorstore, regulation_doc_count, regulation_chunk_count = build_vectorstore(regulation_paths)
+
         state = {
             "file_id": file_id,
             "file_name": file_name,
             "language": language,
             "regulation_scope": regulation_scope,
             "target_text": document_text,
+            "vectorstore": vectorstore,
+            "document_info": {
+                "file_id": file_id,
+                "file_name": file_name,
+                "regulation_scope": regulation_scope,
+                "language": language,
+                "regulation_files": [
+                    Path(path).name
+                    for path in regulation_paths
+                ],
+                "regulation_doc_count": regulation_doc_count,
+                "regulation_chunk_count": regulation_chunk_count,
+                "target_text_length": len(document_text),
+            },
         }
 
         state = review_graph.invoke(state)
@@ -79,7 +121,7 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
         with _lock:
             review_id = next(_id_counter)
 
-        report = state["report"]
+        report = state.get("report", {})
 
         review = {
             "review_id": review_id,
@@ -92,6 +134,7 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
             "highlights": state.get("revised_issues", []),
             "report": report,
             "created_at": datetime.now(tz=timezone.utc),
+            "document_info": state.get("document_info", {}),
             "report_files": {},
         }
 

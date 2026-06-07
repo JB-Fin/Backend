@@ -59,15 +59,7 @@ def run_report_agent(state: dict) -> dict:
 
     response = llm.invoke(prompt)
 
-    # test #
-    print("=== REPORT AGENT RAW RESPONSE ===")
-    print(response.content)
-
     report = safe_parse_json(response.content, default={})
-
-    # test #
-    print("=== PARSED REPORT ===")
-    print(report)
 
     if not isinstance(report, dict):
         report = {}
