@@ -60,14 +60,11 @@ def run_review_agent(state: dict) -> dict:
 
     response = llm.invoke(prompt)
 
+    # test #
     print("=== REVIEW AGENT RAW RESPONSE ===")
     print(response.content)
 
     candidates = safe_parse_json(response.content, default=[])
-
-    # test #
-    print("=== PARSED CANDIDATES ===")
-    print(candidates)
 
     if not isinstance(candidates, list):
         candidates = []
@@ -106,15 +103,7 @@ def run_review_agent(state: dict) -> dict:
                 "evidence": issue_evidence,
             }
         )
-    
-    # test #
-    print("=== HIGHLIGHTED ISSUES BEFORE DEDUPE ===")
-    print(highlighted_issues)
 
     state["highlighted_issues"] = dedupe_by_highlight_text(highlighted_issues)
-
-    # test # 
-    print("=== HIGHLIGHTED ISSUES AFTER DEDUPE ===")
-    print(state["highlighted_issues"])
 
     return state
