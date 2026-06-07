@@ -10,19 +10,90 @@ from reportlab.pdfgen import canvas
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+
+def get_original_text(item: dict) -> str:
+    return (
+        item.get("original_text")
+        or item.get("highlight_text")
+        or "-"
+    )
+
+
+def get_reason(item: dict) -> str:
+    return (
+        item.get("reason")
+        or item.get("revision_reason")
+        or item.get("issue_summary")
+        or "-"
+    )
+
+
+def get_revision_detail(item: dict) -> str:
+    return (
+        item.get("revision_detail")
+        or item.get("review_focus")
+        or "-"
+    )
+
+
+def format_legal_basis(item: dict) -> str:
+    legal_basis = item.get("legal_basis", [])
+
+    if not legal_basis:
+        evidence = item.get("evidence", [])
+        legal_basis = evidence
+
+    if not legal_basis:
+        return "-"
+
+    lines = []
+
+    for basis in legal_basis:
+        if not isinstance(basis, dict):
+            continue
+
+        source = basis.get("source", "-")
+        page = basis.get("page", "-")
+        article = basis.get("article", "")
+        content = basis.get("content", "")
+
+        text = f"{source}"
+        if page not in [None, "", "-"]:
+            text += f" p.{page}"
+        if article:
+            text += f" {article}"
+        if content:
+            text += f" - {content[:120]}"
+
+        lines.append(text)
+
+    return "\n".join(lines) if lines else "-"
+
+
 def format_summary(summary: dict) -> str:
     if not isinstance(summary, dict):
         return str(summary)
 
-    total_issues = summary.get("total_issues", 0)
-    issue_counts = summary.get("issue_summary_counts", {})
+    total_issues = (
+        summary.get("total_issues")
+        or summary.get("total_items")
+        or 0
+    )
 
     lines = [f"총 이슈 수: {total_issues}"]
 
+    issue_counts = summary.get("issue_summary_counts", {})
     for issue, count in issue_counts.items():
         lines.append(f"- {issue}: {count}건")
 
+    key_findings = summary.get("key_findings", [])
+    if key_findings:
+        lines.append("\n주요 발견사항:")
+        for item in key_findings:
+            lines.append(f"- {item}")
+
     return "\n".join(lines)
+
 
 def create_txt_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.txt"
@@ -34,12 +105,15 @@ def create_txt_report(review: dict) -> Path:
         highlights_text += f"""
 {idx}. 수정 필요 사항
 - 페이지: {item.get("page", "-")}
-- 원문: {item.get("original_text", "-")}
+- 원문: {get_original_text(item)}
 - 이슈: {item.get("issue_summary", "-")}
-- 근거: {item.get("reason", "-")}
+- 근거: {format_legal_basis(item)}
 - 수정 제안: {item.get("suggested_text", "-")}
-- 수정 설명: {item.get("revision_detail", "-")}
+- 수정 이유: {get_reason(item)}
+- 수정 설명: {get_revision_detail(item)}
 """
+
+    revised_document = review.get("revised_document", "")
 
     report_path.write_text(
         f"""준법 리스크 검토 보고서
@@ -56,11 +130,15 @@ def create_txt_report(review: dict) -> Path:
 
 [수정 필요 사항]
 {highlights_text}
+
+[수정안 반영 문안]
+{revised_document or "-"}
 """,
         encoding="utf-8",
     )
 
     return report_path
+
 
 def create_docx_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.docx"
@@ -99,12 +177,15 @@ def create_docx_report(review: dict) -> Path:
         for item in highlights:
             row_cells = table.add_row().cells
             row_cells[0].text = str(item.get("page", "-"))
-            row_cells[1].text = item.get("original_text", "-")
+            row_cells[1].text = get_original_text(item)
             row_cells[2].text = item.get("issue_summary", "-")
-            row_cells[3].text = item.get("reason", "-")
+            row_cells[3].text = format_legal_basis(item)
             row_cells[4].text = item.get("suggested_text", "-")
 
-    doc.add_heading("3. 종합 의견", level=1)
+    doc.add_heading("3. 수정안 반영 문안", level=1)
+    doc.add_paragraph(review.get("revised_document", "-") or "-")
+
+    doc.add_heading("4. 종합 의견", level=1)
     doc.add_paragraph(
         "본 보고서는 업로드된 문서의 준법 리스크를 자동 검토한 결과입니다. "
         "실제 법률 판단이 필요한 경우 담당자의 추가 검토가 필요합니다."
@@ -113,6 +194,7 @@ def create_docx_report(review: dict) -> Path:
     doc.save(report_path)
 
     return report_path
+
 
 def create_pdf_report(review: dict) -> Path:
     report_file_name = f"review_{review['review_id']}_report.pdf"
@@ -148,8 +230,8 @@ def create_pdf_report(review: dict) -> Path:
 
     y -= 20
     c.setFont("Helvetica", 10)
-    summary_text = format_summary(review.get("summary", {}))
-    c.drawString(x, y, summary_text[:90])
+    summary_text = format_summary(review.get("summary", {})).replace("\n", " / ")
+    c.drawString(x, y, summary_text[:100])
 
     y -= 35
     c.setFont("Helvetica-Bold", 13)
@@ -159,14 +241,14 @@ def create_pdf_report(review: dict) -> Path:
     c.setFont("Helvetica", 9)
 
     for idx, item in enumerate(review.get("highlights", []), start=1):
-        if y < 100:
+        if y < 120:
             c.showPage()
             y = height - 50
             c.setFont("Helvetica", 9)
 
         c.drawString(x, y, f"{idx}. Page: {item.get('page', '-')}")
         y -= 15
-        c.drawString(x, y, f"Original: {item.get('original_text', '-')[:90]}")
+        c.drawString(x, y, f"Original: {get_original_text(item)[:90]}")
         y -= 15
         c.drawString(x, y, f"Issue: {item.get('issue_summary', '-')[:90]}")
         y -= 15
@@ -176,6 +258,7 @@ def create_pdf_report(review: dict) -> Path:
     c.save()
 
     return report_path
+
 
 def create_reports(review: dict) -> dict:
     txt_path = create_txt_report(review)

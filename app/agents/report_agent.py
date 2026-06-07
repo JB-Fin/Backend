@@ -4,9 +4,20 @@ from app.utils.agent_utils import safe_parse_json
 from app.utils.llm_client import get_llm
 
 MAX_REPORT_INPUT_CHARS = 15000
+SKIP_REPLACEMENT_TEXTS = {
+    "",
+    "검토 필요",
+    "담당자 추가 검토 필요",
+}
 
 def run_report_agent(state: dict) -> dict:
     revised_issues = state.get("revised_issues", [])
+    target_text = state.get("target_text", "")
+
+    revised_document = build_revised_document(
+        target_text=target_text,
+        revised_issues=revised_issues,
+    )
 
     document_info = state.get("document_info") or {
         "file_id": state.get("file_id"),
@@ -18,6 +29,7 @@ def run_report_agent(state: dict) -> dict:
     report_input = {
         "document_info": document_info,
         "revised_issues": revised_issues,
+        "revised_document": revised_document,
     }
 
     llm = get_llm()
@@ -30,6 +42,7 @@ def run_report_agent(state: dict) -> dict:
 - 입력으로 받은 검토 필요 문장과 수정안 후보를 바탕으로 보고서를 작성하세요.
 - 보고서는 "준법 검토 지원 결과"의 형태로 작성하세요.
 - suggested_text는 최종 확정 문구가 아니라 AI 수정안 후보로 표현하세요.
+- revised_document는 수정안 후보가 반영된 문안입니다.
 
 입력 데이터:
 {json.dumps(report_input, ensure_ascii=False, indent=2)[:MAX_REPORT_INPUT_CHARS]}
@@ -68,6 +81,35 @@ def run_report_agent(state: dict) -> dict:
     report["summary"]["total_items"] = len(revised_issues)
     report["summary"]["total_issues"] = len(revised_issues)
 
-    state["report"] = report
+    return {
+        "report": report,
+        "revised_document": revised_document,
+    }
 
-    return state
+def build_revised_document(
+    target_text: str,
+    revised_issues: list[dict],
+) -> str:
+    revised_text = target_text or ""
+
+    for item in revised_issues:
+        original = (
+            item.get("original_text")
+            or item.get("highlight_text")
+            or ""
+        )
+
+        suggested = item.get("suggested_text", "")
+
+        if not original:
+            continue
+
+        if suggested in SKIP_REPLACEMENT_TEXTS:
+            continue
+
+        if original not in revised_text:
+            continue
+
+        revised_text = revised_text.replace(original, suggested)
+
+    return revised_text

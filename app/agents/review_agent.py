@@ -1,6 +1,6 @@
 from app.rag.retriever import retrieve_evidence
 from app.utils.agent_utils import (
-    clean_text, 
+    clean_text,
     safe_parse_json,
     dedupe_by_highlight_text,
     compact_evidence,
@@ -10,9 +10,9 @@ from app.utils.llm_client import get_llm
 TOP_N_ISSUES = 5
 MAX_TARGET_CHARS = 12000
 
+
 def run_review_agent(state: dict) -> dict:
     target_text = state["target_text"]
-
     vectorstore = state.get("vectorstore")
 
     if vectorstore is None:
@@ -25,9 +25,9 @@ def run_review_agent(state: dict) -> dict:
         )
 
     evidence_pool = compact_evidence(evidence_pool)
-    
+
     llm = get_llm()
-    
+
     prompt = f"""
 당신은 준법 검토 지원 시스템의 Review Agent입니다.
 
@@ -43,6 +43,9 @@ def run_review_agent(state: dict) -> dict:
 {evidence_pool}
 
 반드시 JSON 배열로만 답하세요.
+마크다운 코드블록을 쓰지 마세요.
+설명 문장을 쓰지 마세요.
+반드시 [ 로 시작하고 ] 로 끝나는 JSON 배열만 출력하세요.
 
 출력 형식:
 [
@@ -54,16 +57,12 @@ def run_review_agent(state: dict) -> dict:
     "revision_guideline": "수정 방향 제안"
   }}
 ]
+
 [검토 대상 문서]
 {target_text[:MAX_TARGET_CHARS]}
 """
 
     response = llm.invoke(prompt)
-
-    # test #
-    print("=== REVIEW AGENT RAW RESPONSE ===")
-    print(response.content)
-
     candidates = safe_parse_json(response.content, default=[])
 
     if not isinstance(candidates, list):
@@ -104,6 +103,8 @@ def run_review_agent(state: dict) -> dict:
             }
         )
 
-    state["highlighted_issues"] = dedupe_by_highlight_text(highlighted_issues)
+    highlighted_issues = dedupe_by_highlight_text(highlighted_issues)
 
-    return state
+    return {
+        "highlighted_issues": highlighted_issues,
+    }
