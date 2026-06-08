@@ -1,5 +1,7 @@
-from app.utils.llm_client import get_llm
+import json
 
+from app.utils.llm_client import get_llm
+from app.utils.agent_utils import safe_parse_json
 
 def run_faq_agent(
     question: str,
@@ -42,16 +44,35 @@ def run_faq_agent(
 관련 근거:
 {context}
 
-답변에는 다음을 포함하세요.
-1. 질문에 대한 답변
-2. 확인한 근거
-3. 담당자가 추가 확인할 검토 포인트
+반드시 JSON 객체로만 답하세요.
+마크다운 코드블록을 쓰지 마세요.
+설명 문장을 쓰지 마세요.
+
+출력 형식:
+{{
+  "answer": "질문에 대한 답변",
+  "review_point": [
+    "담당자가 추가로 확인해야 할 검토 포인트 1",
+    "담당자가 추가로 확인해야 할 검토 포인트 2"
+  ]
+}}
 """
 
     response = llm.invoke(prompt)
 
+    parsed = safe_parse_json(response.content, default={})
+
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    answer = parsed.get("answer")
+    review_point = parsed.get("review_point", [])
+
+    if not isinstance(review_point, list):
+        review_point = []
+
     return {
-        "answer": str(response.content),
+        "answer": str(answer or response.content),
         "sources": sources,
-        "review_point": [],
+        "review_point": review_point,
     }
