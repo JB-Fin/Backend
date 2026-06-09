@@ -9,7 +9,7 @@ router = APIRouter()
 def chat(request: ChatRequest):
     try:
         return answer_question(
-            question=request.message,
+            message=request.message,
             language=request.language,
         )
 
