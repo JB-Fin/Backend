@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
+from app.api.v1.schemas.language import LanguageUpdateRequest
 
 router = APIRouter()
 
@@ -20,3 +21,10 @@ def get_languages():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"언어 목록 조회 중 오류가 발생했습니다: {str(e)}",
         )
+    
+@router.put("/settings/language")
+def update_language(request: LanguageUpdateRequest):
+    return {
+        "message": "언어 설정 변경 완료",
+        "language": request.language,
+    }
