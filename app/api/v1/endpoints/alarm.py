@@ -14,6 +14,8 @@ from app.services.alarm_service import (
 
 router = APIRouter()
 
+# dummy_alarms = [{},{},{}]
+
 @router.post("", response_model=AlarmResponse)
 def create_new_alarm(request: AlarmCreateRequest):
     try:

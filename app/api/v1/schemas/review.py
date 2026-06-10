@@ -5,7 +5,6 @@ from pydantic import BaseModel
 class ReviewAnalyzeRequest(BaseModel):
     file_id: int
     language: str = "ko"
-    regulation_scope: str = "internal_external"
 
 class HighlightItem(BaseModel):
     issue_id: int
