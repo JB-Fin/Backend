@@ -18,8 +18,8 @@ class HighlightItem(BaseModel):
     evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 class ReviewSummary(BaseModel):
-    total_issues: int
-    issue_summary_counts: dict[str, int]
+    total_issues: int = 0
+    issue_summary_counts: dict[str, int] = Field(default_factory=dict)
 
 class ReviewAnalyzeResponse(BaseModel):
     review_id: int
@@ -28,7 +28,7 @@ class ReviewAnalyzeResponse(BaseModel):
     status: str
     language: str
     regulation_scope: Optional[str] = None
-    summary: ReviewSummary
+    summary: ReviewSummary = Field(default_factory=ReviewSummary)
     highlights: list[HighlightItem] = Field(default_factory=list)
     created_at: datetime
     report_files: dict[str, str] = Field(default_factory=dict)
