@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Any
+from pydantic import BaseModel, Field
 
 class ReviewAnalyzeRequest(BaseModel):
     file_id: int
@@ -14,6 +14,8 @@ class HighlightItem(BaseModel):
     reason: str
     suggested_text: str
     revision_detail: str
+    legal_basis: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 class ReviewSummary(BaseModel):
     total_issues: int
@@ -27,9 +29,9 @@ class ReviewAnalyzeResponse(BaseModel):
     language: str
     regulation_scope: Optional[str] = None
     summary: ReviewSummary
-    highlights: list[HighlightItem]
+    highlights: list[HighlightItem] = Field(default_factory=list)
     created_at: datetime
-    report_files: dict[str, str] = {}
+    report_files: dict[str, str] = Field(default_factory=dict)
 
 class ReviewDetailResponse(ReviewAnalyzeResponse):
     """

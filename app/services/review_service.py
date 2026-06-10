@@ -75,6 +75,72 @@ def get_regulation_paths() -> list[str]:
 
     return regulation_paths
 
+def normalize_summary(summary: dict | None, highlights: list[dict]) -> dict:
+    if not isinstance(summary, dict):
+        summary = {}
+
+    issue_summary_counts = summary.get("issue_summary_counts")
+
+    if not isinstance(issue_summary_counts, dict):
+        issue_summary_counts = {}
+
+    return {
+        "total_issues": summary.get("total_issues", len(highlights)),
+        "issue_summary_counts": issue_summary_counts,
+    }
+
+
+def normalize_highlight(item: dict, index: int) -> dict:
+    if not isinstance(item, dict):
+        item = {}
+
+    legal_basis = item.get("legal_basis", [])
+    evidence = item.get("evidence", [])
+
+    if not isinstance(legal_basis, list):
+        legal_basis = []
+
+    if not isinstance(evidence, list):
+        evidence = []
+
+    return {
+        "issue_id": item.get("issue_id", index + 1),
+        "page": item.get("page"),
+
+        # 프론트가 기대하는 필드
+        "original_text": (
+            item.get("original_text")
+            or item.get("highlight_text")
+            or ""
+        ),
+        "issue_summary": item.get("issue_summary", ""),
+        "reason": (
+            item.get("reason")
+            or item.get("revision_reason")
+            or ""
+        ),
+        "suggested_text": item.get("suggested_text", ""),
+        "revision_detail": (
+            item.get("revision_detail")
+            or item.get("revision_reason")
+            or item.get("reason")
+            or ""
+        ),
+
+        # 근거자료 유지
+        "legal_basis": legal_basis,
+        "evidence": evidence,
+    }
+
+
+def normalize_highlights(raw_highlights: list | None) -> list[dict]:
+    if not isinstance(raw_highlights, list):
+        return []
+
+    return [
+        normalize_highlight(item, index)
+        for index, item in enumerate(raw_highlights)
+    ]
 
 def analyze_review(file_id: int, language: str, regulation_scope: str):
     try:
@@ -123,6 +189,10 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
 
         report = state.get("report", {})
 
+        raw_highlights = state.get("revised_issues", [])
+        highlights = normalize_highlights(raw_highlights)
+        summary = normalize_summary(report.get("summary", {}), highlights)
+
         review = {
             "review_id": review_id,
             "file_id": file_id,
@@ -130,8 +200,8 @@ def analyze_review(file_id: int, language: str, regulation_scope: str):
             "status": "completed",
             "language": language,
             "regulation_scope": regulation_scope,
-            "summary": report.get("summary", {}),
-            "highlights": state.get("revised_issues", []),
+            "summary": summary,
+            "highlights": highlights,
             "report": report,
             "revised_document": state.get("revised_document", ""),
             "created_at": datetime.now(tz=timezone.utc),
