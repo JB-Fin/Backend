@@ -8,9 +8,8 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-
-    # 프론트 배포 시 주소 추가
-    # "https://jb-fin-frontend.vercel.app",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 app.add_middleware(
