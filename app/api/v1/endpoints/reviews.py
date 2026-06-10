@@ -24,7 +24,7 @@ def analyze_document(request: ReviewAnalyzeRequest):
         return analyze_review(
             file_id=request.file_id,
             language=request.language,
-            regulation_scope=request.regulation_scope,
+            regulation_scope="internal_external",
         )
 
     except HTTPException:
