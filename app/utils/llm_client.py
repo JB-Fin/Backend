@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
-LLM_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+LLM_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 
 def get_llm() -> ChatOpenAI:
     return ChatOpenAI(
