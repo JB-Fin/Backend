@@ -79,12 +79,151 @@
 
 import logging
 from datetime import datetime
-import json
 
 from app.utils.llm_client import get_llm
 from app.utils.agent_utils import safe_parse_json
 
 logger = logging.getLogger("faq_agent")
+
+
+def _get_evidence_content(item: dict) -> str:
+    if not isinstance(item, dict):
+        return ""
+
+    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+
+    content = (
+        item.get("content")
+        or item.get("page_content")
+        or item.get("text")
+        or item.get("chunk")
+        or item.get("document")
+        or metadata.get("content")
+        or metadata.get("text")
+        or ""
+    )
+
+    return str(content).strip()
+
+
+def _get_source_name(item: dict) -> str:
+    if not isinstance(item, dict):
+        return "unknown"
+
+    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+
+    return (
+        item.get("title")
+        or item.get("source")
+        or item.get("regulation_id")
+        or metadata.get("title")
+        or metadata.get("source")
+        or metadata.get("regulation_id")
+        or "unknown"
+    )
+
+
+def _get_page(item: dict):
+    if not isinstance(item, dict):
+        return "-"
+
+    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+
+    return (
+        item.get("page")
+        or item.get("page_number")
+        or metadata.get("page")
+        or metadata.get("page_number")
+        or "-"
+    )
+
+
+def _normalize_list(value):
+    if isinstance(value, list):
+        return value
+    if value in (None, ""):
+        return []
+    return [str(value)]
+
+
+def _build_context(evidence: list[dict]) -> tuple[list[str], str]:
+    sources = []
+    context_items = []
+
+    for idx, item in enumerate(evidence, start=1):
+        if not isinstance(item, dict):
+            logger.warning(
+                "[FAQ DEBUG] evidence item이 dict가 아님 - idx=%d, item=%s",
+                idx,
+                item,
+            )
+            continue
+
+        source_name = _get_source_name(item)
+        page = _get_page(item)
+        content = _get_evidence_content(item)
+
+        sources.append(source_name)
+
+        if not content:
+            logger.warning(
+                "[FAQ DEBUG] content 없음 - idx=%d, keys=%s, item=%s",
+                idx,
+                list(item.keys()),
+                item,
+            )
+            continue
+
+        context_items.append(
+            f"[근거 {idx}]\n"
+            f"문서: {source_name}\n"
+            f"페이지: {page}\n"
+            f"내용: {content}"
+        )
+
+    return sources, "\n\n".join(context_items)
+
+
+def _build_prompt(question: str, context: str, language: str) -> str:
+    return f"""
+당신은 금융회사 법무팀 및 준법감시인을 지원하는 FAQ Assistant입니다.
+
+반드시 제공된 문서 내용만 근거로 답변하세요.
+
+답변 원칙:
+1. 문서에서 확인되는 내용만 답변하세요.
+2. 문서에 없는 내용은 추측하지 마세요.
+3. 근거가 부족하거나 확인할 수 없는 경우에도 반드시 JSON 형식으로 답하세요.
+4. 근거가 부족한 경우 answer에는 "현재 제공된 규정만으로는 판단하기 어렵습니다."라고 작성하세요.
+5. 최종 법률 판단을 하지 마세요.
+6. 관련 규정명 또는 조항이 확인되는 경우 함께 제시하세요.
+7. 답변 언어는 {language}입니다.
+
+질문:
+{question}
+
+관련 문서:
+{context}
+
+반드시 아래 JSON 객체 형식으로만 답하세요.
+마크다운 코드블록을 쓰지 마세요.
+JSON 밖에 설명 문장을 쓰지 마세요.
+일반 문장만 단독으로 출력하지 마세요.
+
+출력 형식:
+{{
+  "answer": "근거 기반 답변",
+  "matched_evidence": [
+    {{
+      "evidence_no": 1,
+      "reason": "이 근거가 질문과 관련되는 이유"
+    }}
+  ],
+  "review_point": [
+    "추가 확인이 필요한 사항"
+  ]
+}}
+"""
 
 
 def run_faq_agent(
@@ -97,88 +236,42 @@ def run_faq_agent(
     logger.info("[FAQ AGENT] 시작")
     logger.info("[FAQ AGENT] language=%s", language)
     logger.info("[FAQ AGENT] question_length=%d", len(question or ""))
-    logger.info("[FAQ AGENT] evidence_count=%d", len(evidence or []))
+
+    evidence = evidence or []
+    logger.info("[FAQ AGENT] evidence_count=%d", len(evidence))
     logger.warning("[FAQ DEBUG] evidence_sample=%s", evidence[:2])
-    logger.warning("[FAQ DEBUG] context_length=%d", len(context))
-    logger.warning("[FAQ DEBUG] context_preview=%s", context[:2000])
 
     try:
-        evidence = evidence or []
+        sources, context = _build_context(evidence)
 
-        sources = [
-            item.get("title")
-            or item.get("source")
-            or item.get("regulation_id")
-            or "unknown"
-            for item in evidence
-            if isinstance(item, dict)
-        ]
-
-        context_items = []
-
-        for idx, item in enumerate(evidence, start=1):
-            if not isinstance(item, dict):
-                continue
-
-            content = item.get("content", "")
-            if not content:
-                continue
-
-            context_items.append(
-                f"[근거 {idx}]\n"
-                f"문서: {item.get('title') or item.get('source') or item.get('regulation_id') or 'unknown'}\n"
-                f"페이지: {item.get('page', '-')}\n"
-                f"내용: {content}"
-            )
-
-        context = "\n\n".join(context_items)
-
-        logger.info("[FAQ AGENT] context 생성 완료 - context_length=%d", len(context))
-        logger.debug("[FAQ AGENT] sources=%s", sources)
+        logger.warning("[FAQ DEBUG] question=%s", question)
+        logger.warning("[FAQ DEBUG] context_length=%d", len(context))
+        logger.warning("[FAQ DEBUG] context_preview=%s", context[:2000])
 
         if not context.strip():
             return {
                 "answer": "현재 제공된 규정 근거가 없어 판단하기 어렵습니다.",
-                "sources": [],
-                "review_point": ["검색된 규정 근거가 없습니다."],
+                "sources": sources,
+                "matched_evidence": [],
+                "review_point": [
+                    "RAG 검색 결과에 근거 텍스트가 없습니다.",
+                    "content, page_content, text, chunk 필드명을 확인하세요.",
+                ],
+                "debug": {
+                    "evidence_count": len(evidence),
+                    "context_length": 0,
+                    "reason": "empty_context",
+                },
             }
 
         llm = get_llm()
         logger.info("[FAQ AGENT] LLM 객체 생성 완료")
 
-        prompt = f"""
-당신은 규정 기반 FAQ 답변 Agent입니다.
-
-역할:
-- 사용자의 질문에 대해 제공된 관련 근거를 바탕으로 답변합니다.
-- 최종 법률 판단이 아니라, 제공된 규정 근거에 기반한 안내 답변을 작성합니다.
-
-답변 원칙:
-- 반드시 관련 근거의 내용 안에서만 답변하세요.
-- 근거에 직접적으로 관련된 내용이 있으면, "답변할 수 없다"고 하지 말고 근거 범위 내에서 답변하세요.
-- 근거가 일부만 충분하면, 가능한 부분은 답변하고 부족한 부분은 별도로 표시하세요.
-- 근거가 전혀 관련 없을 때만 "현재 제공된 규정만으로는 판단하기 어렵습니다."라고 답하세요.
-- 법령명, 페이지, 근거 번호를 활용해 답변하세요.
-- 답변 언어는 {language}입니다.
-
-질문:
-{question}
-
-관련 근거:
-{context}
-
-반드시 JSON 객체로만 답하세요.
-마크다운 코드블록을 쓰지 마세요.
-설명 문장을 JSON 밖에 쓰지 마세요.
-
-출력 형식:
-{{
-  "answer": "근거 기반 답변",
-  "review_point": [
-    "추가 확인이 필요한 사항"
-  ]
-}}
-"""
+        prompt = _build_prompt(
+            question=question,
+            context=context,
+            language=language,
+        )
 
         logger.info("[FAQ AGENT] LLM 호출 시작")
         llm_start = datetime.now()
@@ -188,25 +281,39 @@ def run_faq_agent(
         llm_elapsed = (datetime.now() - llm_start).total_seconds()
         logger.info("[FAQ AGENT] LLM 호출 완료 - %.2f초", llm_elapsed)
 
-        content = getattr(response, "content", "")
-        logger.debug("[FAQ AGENT] raw_response_preview=%s", str(content)[:500])
+        raw_content = getattr(response, "content", "")
+        content = str(raw_content).strip()
 
-        parsed = safe_parse_json(content, default={})
-        logger.info("[FAQ AGENT] JSON 파싱 완료 - parsed_type=%s", type(parsed).__name__)
+        logger.warning("[FAQ DEBUG] raw_response=%r", content[:2000])
+
+        parsed = safe_parse_json(content, default=None)
 
         if not isinstance(parsed, dict):
-            logger.warning("[FAQ AGENT] parsed가 dict가 아님. fallback 처리")
-            parsed = {}
+            logger.warning("[FAQ AGENT] JSON 파싱 실패. raw text fallback 처리")
+            parsed = {
+                "answer": content or "현재 제공된 규정만으로는 판단하기 어렵습니다.",
+                "matched_evidence": [],
+                "review_point": [
+                    "LLM 응답이 JSON 형식이 아니어서 원문 응답을 answer로 처리했습니다."
+                ],
+            }
 
-        answer = parsed.get("answer") or "현재 제공된 규정만으로는 판단하기 어렵습니다."
-        review_point = parsed.get("review_point", [])
+        logger.info(
+            "[FAQ AGENT] JSON 파싱 처리 완료 - parsed_type=%s",
+            type(parsed).__name__,
+        )
 
-        if not isinstance(review_point, list):
-            review_point = []
+        answer = parsed.get("answer")
+        if not answer:
+            answer = "현재 제공된 규정만으로는 판단하기 어렵습니다."
+
+        review_point = _normalize_list(parsed.get("review_point"))
+        matched_evidence = _normalize_list(parsed.get("matched_evidence"))
 
         result = {
             "answer": str(answer),
             "sources": sources,
+            "matched_evidence": matched_evidence,
             "review_point": review_point,
         }
 

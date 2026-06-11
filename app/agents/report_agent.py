@@ -34,40 +34,69 @@ def run_report_agent(state: dict) -> dict:
 
     llm = get_llm()
 
+#     prompt = f"""
+# 당신은 준법 검토 결과보고서 작성 Agent입니다.
+
+# 중요:
+# - AI가 최종 위반 여부를 판정한 것처럼 작성하지 마세요.
+# - 입력으로 받은 검토 필요 문장과 수정안 후보를 바탕으로 보고서를 작성하세요.
+# - 보고서는 "준법 검토 지원 결과"의 형태로 작성하세요.
+# - suggested_text는 최종 확정 문구가 아니라 AI 수정안 후보로 표현하세요.
+# - revised_document는 수정안 후보가 반영된 문안입니다.
+
+# 입력 데이터:
+# {json.dumps(report_input, ensure_ascii=False, indent=2)[:MAX_REPORT_INPUT_CHARS]}
+
+# 반드시 JSON 객체로만 답하세요.
+
+# 출력 형식:
+# {{
+#   "review_overview": "검토 개요",
+#   "overall_opinion": "종합 의견",
+#   "summary": {{
+#     "total_items": 0,
+#     "key_findings": []
+#   }},
+#   "detailed_reviews": [
+#     {{
+#       "issue_id": 1,
+#       "highlight_text": "원문",
+#       "suggested_text": "AI 수정안 후보",
+#       "legal_basis": [],
+#       "revision_reason": "수정 이유"
+#     }}
+#   ],
+#   "follow_up_actions": []
+# }}
+# """
+
     prompt = f"""
-당신은 준법 검토 결과보고서 작성 Agent입니다.
+당신은 금융회사 법무팀 및 준법감시인을 지원하는
+FAQ Assistant다.
 
-중요:
-- AI가 최종 위반 여부를 판정한 것처럼 작성하지 마세요.
-- 입력으로 받은 검토 필요 문장과 수정안 후보를 바탕으로 보고서를 작성하세요.
-- 보고서는 "준법 검토 지원 결과"의 형태로 작성하세요.
-- suggested_text는 최종 확정 문구가 아니라 AI 수정안 후보로 표현하세요.
-- revised_document는 수정안 후보가 반영된 문안입니다.
+반드시 제공된 문서 내용만 근거로 답변하라.
 
-입력 데이터:
+답변 원칙
+
+1. 문서에서 확인되는 내용만 답변하라.
+
+2. 문서에 없는 내용은 추측하지 마라.
+
+3. 근거가 부족하거나 확인할 수 없는 경우
+
+"현재 제공된 규정만으로는 판단하기 어렵습니다."
+
+라고 답하라.
+
+4. 최종 법률 판단을 하지 마라.
+
+5. 관련 규정명 또는 조항이 확인되는 경우 함께 제시하라.
+
+6. 필요한 경우 검토 포인트를 제시할 수 있다.
+
+검토 데이터:
+
 {json.dumps(report_input, ensure_ascii=False, indent=2)[:MAX_REPORT_INPUT_CHARS]}
-
-반드시 JSON 객체로만 답하세요.
-
-출력 형식:
-{{
-  "review_overview": "검토 개요",
-  "overall_opinion": "종합 의견",
-  "summary": {{
-    "total_items": 0,
-    "key_findings": []
-  }},
-  "detailed_reviews": [
-    {{
-      "issue_id": 1,
-      "highlight_text": "원문",
-      "suggested_text": "AI 수정안 후보",
-      "legal_basis": [],
-      "revision_reason": "수정 이유"
-    }}
-  ],
-  "follow_up_actions": []
-}}
 """
 
     response = llm.invoke(prompt)
