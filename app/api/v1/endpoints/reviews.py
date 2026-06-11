@@ -29,13 +29,13 @@ def analyze_document(
     "completed" 또는 "failed"가 될 때까지 기다린다.
     """
     regulation_scope = "internal_external"
-    # pending 레코드 즉시 생성
+    
     review = create_pending_review(
         file_id=request.file_id,
         language=request.language,
         regulation_scope=regulation_scope,
     )
-    # 실제 분석은 백그라운드에서 실행 (타임아웃 무관)
+    
     background_tasks.add_task(
         run_analyze_background,
         review_id=review["review_id"],
@@ -51,7 +51,10 @@ def analyze_document(
 
 @router.get("")
 def list_reviews():
-    reviews = get_reviews()
+    reviews = [
+        review for review in get_reviews()
+        if review.get("status") == "completed"
+    ]
     return {"total": len(reviews), "items": reviews}
 
 @router.get("/{review_id}", response_model=ReviewDetailResponse)

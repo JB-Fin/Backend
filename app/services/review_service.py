@@ -276,13 +276,11 @@ from app.graphs.review_graph import review_graph
 from app.rag.document_loader import load_file
 from app.rag.vector_store import build_vectorstore
 
-# ── 로거 설정 ──────────────────────────────────
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
 logger = logging.getLogger("review_service")
-# ───────────────────────────────────────────────
 
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -297,10 +295,6 @@ REVIEWS_DB: list[dict] = []
 _lock = threading.Lock()
 _id_counter = itertools.count(1)
 
-
-# ──────────────────────────────────────────────
-# 내부 헬퍼
-# ──────────────────────────────────────────────
 
 def extract_text_from_file(file_info: dict) -> str:
     file_path = (
@@ -414,10 +408,6 @@ def normalize_highlights(raw_highlights: list | None) -> list[dict]:
     return [normalize_highlight(item, i) for i, item in enumerate(raw_highlights)]
 
 
-# ──────────────────────────────────────────────
-# 백그라운드 실행 함수 (디버그 로그 포함)
-# ──────────────────────────────────────────────
-
 def run_analyze_background(review_id: int, file_id: int, language: str, regulation_scope: str):
     logger.info("=" * 60)
     logger.info("[STEP 0] 분석 시작 - review_id=%d, file_id=%d", review_id, file_id)
@@ -432,7 +422,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
                     break
 
     try:
-        # ── STEP 1: 파일 조회 ──────────────────
         logger.info("[STEP 1] 파일 정보 조회 중 - file_id=%d", file_id)
         file_info = get_file_by_id(file_id)
         logger.info("[STEP 1] 완료 - file_info keys: %s", list(file_info.keys()))
@@ -446,17 +435,14 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
         )
         logger.info("[STEP 1] 파일명: %s", file_name)
 
-        # ── STEP 2: 텍스트 추출 ───────────────
         logger.info("[STEP 2] 텍스트 추출 중...")
         document_text = extract_text_from_file(file_info)
         logger.info("[STEP 2] 완료 - 텍스트 길이: %d자", len(document_text))
 
-        # ── STEP 3: 규정 경로 수집 ────────────
         logger.info("[STEP 3] 규정 파일 경로 수집 중...")
         regulation_paths = get_regulation_paths()
         logger.info("[STEP 3] 완료 - 파일 수: %d", len(regulation_paths))
 
-        # ── STEP 4: 벡터스토어 빌드 ──────────
         logger.info("[STEP 4] 벡터스토어 빌드 중...")
         vectorstore, regulation_doc_count, regulation_chunk_count = build_vectorstore(regulation_paths)
         logger.info(
@@ -484,7 +470,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
             },
         }
 
-        # ── STEP 5: LangGraph 실행 (가장 오래 걸리는 구간) ──
         logger.info("[STEP 5] review_graph.invoke() 시작 - LLM 호출 구간")
         graph_start = datetime.now()
 
@@ -494,7 +479,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
         logger.info("[STEP 5] 완료 - 소요 시간: %.1f초", elapsed)
         logger.debug("[STEP 5] state keys: %s", list(state.keys()))
 
-        # ── STEP 6: 결과 정규화 ───────────────
         logger.info("[STEP 6] 결과 정규화 중...")
         report = state.get("report", {})
         raw_highlights = state.get("revised_issues", [])
@@ -506,7 +490,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
         summary = normalize_summary(report.get("summary", {}), highlights)
         logger.info("[STEP 6] 완료 - 이슈 수: %d", len(highlights))
 
-        # ── STEP 7: 보고서 생성 ───────────────
         logger.info("[STEP 7] 보고서 파일 생성 중...")
         full_review = {
             "review_id": review_id,
@@ -526,7 +509,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
         full_review["report_files"] = create_reports(full_review)
         logger.info("[STEP 7] 완료 - 생성된 파일: %s", full_review["report_files"])
 
-        # ── STEP 8: DB 저장 ───────────────────
         _update_status("completed", **{k: v for k, v in full_review.items() if k != "review_id"})
         logger.info("[STEP 8] DB 저장 완료 - review_id=%d 분석 성공", review_id)
         logger.info("=" * 60)
@@ -534,11 +516,6 @@ def run_analyze_background(review_id: int, file_id: int, language: str, regulati
     except Exception as e:
         logger.exception("[ERROR] review_id=%d 분석 실패 - %s", review_id, str(e))
         _update_status("failed", error_detail=str(e))
-
-
-# ──────────────────────────────────────────────
-# 공개 API
-# ──────────────────────────────────────────────
 
 def create_pending_review(file_id: int, language: str, regulation_scope: str) -> dict:
     with _lock:
@@ -565,9 +542,16 @@ def create_pending_review(file_id: int, language: str, regulation_scope: str) ->
     return review
 
 
-def get_reviews() -> list[dict]:
-    return REVIEWS_DB
+def get_reviews(status_filter: str | None = None) -> list[dict]:
+    reviews = REVIEWS_DB
 
+    if status_filter:
+        reviews = [
+            review for review in reviews
+            if review.get("status") == status_filter
+        ]
+
+    return reviews
 
 def get_review_by_id(review_id: int) -> dict:
     for review in REVIEWS_DB:
