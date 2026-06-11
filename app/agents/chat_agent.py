@@ -242,7 +242,7 @@ def run_faq_agent(
 
 출력 형식:
 {{
-  "answer": "근거 기반 답변. 사용한 근거 번호를 포함하세요.",
+  "answer": "근거 기반 답변.",
   "matched_evidence": [
     {{
       "evidence_no": 1,

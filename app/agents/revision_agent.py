@@ -184,94 +184,58 @@ def run_revision_agent(state: dict) -> dict:
 
     llm = get_llm()
 
-#     prompt = f"""
-# 당신은 준법 문서 수정 지원 시스템의 Revision Agent입니다.
+    prompt = f"""
+당신은 준법 문서 수정 지원 시스템의 Revision Agent입니다.
 
-# 역할:
-# - 입력으로 받은 highlight_text를 대체할 수 있는 수정안 후보를 작성합니다.
-# - 최종 위반 여부를 판정하지 않습니다.
-# - 법령 해석, 위반 확률, 심각도 점수, 리스크 점수는 생성하지 않습니다.
+역할:
+- 입력으로 받은 highlight_text를 대체할 수 있는 수정안 후보를 작성합니다.
+- 최종 위반 여부를 판정하지 않습니다.
+- 법령 해석, 위반 확률, 심각도 점수, 리스크 점수는 생성하지 않습니다.
 
-# 중요:
-# - suggested_text는 반드시 원문 highlight_text를 대체할 수 있는 완성된 문장이어야 합니다.
-# - suggested_text에는 설명문, 지시문, 검토 요청 문장을 쓰지 마세요.
-# - suggested_text는 실제 문서에 바로 삽입 가능한 광고/안내 문구여야 합니다.
-# - 근거가 부족하면 suggested_text는 "검토 필요"로 작성하세요.
-# - legal_basis는 생성하지 마세요. 빈 배열 []로 두세요.
-# - 법령이나 조항을 새로 만들지 마세요.
-# - evidence.content를 요약하거나 재해석하지 마세요.
+중요:
+- suggested_text는 반드시 원문 highlight_text를 대체할 수 있는 완성된 문장이어야 합니다.
+- suggested_text에는 설명문, 지시문, 검토 요청 문장을 쓰지 마세요.
+- suggested_text는 실제 문서에 바로 삽입 가능한 광고/안내 문구여야 합니다.
+- 근거가 부족하면 suggested_text는 "검토 필요"로 작성하세요.
+- legal_basis는 생성하지 마세요. 빈 배열 []로 두세요.
+- 법령이나 조항을 새로 만들지 마세요.
+- evidence.content를 요약하거나 재해석하지 마세요.
 
-# suggested_text 금지 표현:
-# - "...하십시오"
-# - "...하세요"
-# - "...수정하십시오"
-# - "...명확히 하십시오"
-# - "...근거를 제시하십시오"
-# - "...검토가 필요합니다"
+suggested_text 금지 표현:
+- "...하십시오"
+- "...하세요"
+- "...수정하십시오"
+- "...명확히 하십시오"
+- "...근거를 제시하십시오"
+- "...검토가 필요합니다"
 
-# 좋은 예:
-# 원문: "누구나 연 12%의 확정 수익을 받을 수 있습니다."
-# suggested_text: "예상 수익률은 시장 상황에 따라 변동될 수 있으며 원금 손실이 발생할 수 있습니다."
+좋은 예:
+원문: "누구나 연 12%의 확정 수익을 받을 수 있습니다."
+suggested_text: "예상 수익률은 시장 상황에 따라 변동될 수 있으며 원금 손실이 발생할 수 있습니다."
 
-# 나쁜 예:
-# suggested_text: "수익률이 확정적임을 명확히 하거나 기대 수익임을 표기하십시오."
+나쁜 예:
+suggested_text: "수익률이 확정적임을 명확히 하거나 기대 수익임을 표기하십시오."
 
-# 입력 데이터:
-# {json.dumps(highlighted_issues, ensure_ascii=False, indent=2)}
+입력 데이터:
+{json.dumps(highlighted_issues, ensure_ascii=False, indent=2)}
 
-# 반드시 JSON 객체로만 답하세요.
-# 마크다운 코드블록을 쓰지 마세요.
-# 설명 문장을 쓰지 마세요.
+반드시 JSON 객체로만 답하세요.
+마크다운 코드블록을 쓰지 마세요.
+설명 문장을 쓰지 마세요.
 
-# 출력 형식:
-# {{
-#   "revised_issues": [
-#     {{
-#       "issue_id": 1,
-#       "highlight_text": "원문 하이라이트 문장",
-#       "issue_summary": "검토 필요 사유 요약",
-#       "suggested_text": "원문을 대체할 수 있는 완성된 수정안 후보 문장",
-#       "revision_reason": "수정안 제안 이유",
-#       "legal_basis": []
-#     }}
-#   ]
-# }}
-# """
-
-        prompt = f"""
-당신은 금융광고 문구 수정 전문가다.
-
-문제 문장과 관련 근거를 참고하여
-소비자 오인 가능성을 줄이는 수정안을 작성하라.
-
-반드시 JSON 형식으로 출력하라.
-
-original_text에는
-문제 문장을 수정하지 말고
-입력된 문제 문장을 그대로 복사하여 넣어라.
-
-suggested_text에는
-실제 수정된 문장을 작성하라.
-
-예시:
-
+출력 형식:
 {{
-  "original_text":"...",
-  "problem_reason":"...",
-  "suggested_text":"..."
+  "revised_issues": [
+    {{
+      "issue_id": 1,
+      "highlight_text": "원문 하이라이트 문장",
+      "issue_summary": "검토 필요 사유 요약",
+      "suggested_text": "원문을 대체할 수 있는 완성된 수정안 후보 문장",
+      "revision_reason": "수정안 제안 이유",
+      "legal_basis": []
+    }}
+  ]
 }}
-
-문제 문장:
-
-{issue["highlight_text"]}
-
-문제 사유:
-
-{issue["issue_summary"]}
-
-관련 근거:
-
-{evidence_text}
 """
 
     response = llm.invoke(prompt)
