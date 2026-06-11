@@ -98,6 +98,9 @@ def run_faq_agent(
     logger.info("[FAQ AGENT] language=%s", language)
     logger.info("[FAQ AGENT] question_length=%d", len(question or ""))
     logger.info("[FAQ AGENT] evidence_count=%d", len(evidence or []))
+    logger.warning("[FAQ DEBUG] evidence_sample=%s", evidence[:2])
+    logger.warning("[FAQ DEBUG] context_length=%d", len(context))
+    logger.warning("[FAQ DEBUG] context_preview=%s", context[:2000])
 
     try:
         evidence = evidence or []
