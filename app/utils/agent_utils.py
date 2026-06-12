@@ -39,15 +39,28 @@ def extract_json_from_text(text: str):
     raise ValueError("JSON 파싱 실패:\n" + text)
 
 
-def safe_parse_json(text: str, default):
+import json
+import logging
+
+logger = logging.getLogger("json_parser")
+
+
+def safe_parse_json(text: str, default=None):
+    text = str(text or "").strip()
+
+    if not text:
+        return default
+
     try:
         return extract_json_from_text(text)
-    except Exception as e:
-        print("=== JSON PARSE ERROR ===")
-        print(e)
-        print("=== RAW TEXT ===")
-        print(text)
-        return default
+
+    except Exception:
+        # LLM이 JSON 대신 일반 문장만 반환한 경우
+        return {
+            "answer": text,
+            "matched_evidence": [],
+            "review_point": [],
+        }
 
 
 def normalize_key(value: Any) -> str:
