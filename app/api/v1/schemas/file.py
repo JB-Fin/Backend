@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
 
-
 class FileUploadResponse(BaseModel):
     file_id: int
     file_name: str
