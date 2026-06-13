@@ -34,42 +34,6 @@ def run_report_agent(state: dict) -> dict:
 
     llm = get_llm()
 
-#     prompt = f"""
-# 당신은 준법 검토 결과보고서 작성 Agent입니다.
-
-# 중요:
-# - AI가 최종 위반 여부를 판정한 것처럼 작성하지 마세요.
-# - 입력으로 받은 검토 필요 문장과 수정안 후보를 바탕으로 보고서를 작성하세요.
-# - 보고서는 "준법 검토 지원 결과"의 형태로 작성하세요.
-# - suggested_text는 최종 확정 문구가 아니라 AI 수정안 후보로 표현하세요.
-# - revised_document는 수정안 후보가 반영된 문안입니다.
-
-# 입력 데이터:
-# {json.dumps(report_input, ensure_ascii=False, indent=2)[:MAX_REPORT_INPUT_CHARS]}
-
-# 반드시 JSON 객체로만 답하세요.
-
-# 출력 형식:
-# {{
-#   "review_overview": "검토 개요",
-#   "overall_opinion": "종합 의견",
-#   "summary": {{
-#     "total_items": 0,
-#     "key_findings": []
-#   }},
-#   "detailed_reviews": [
-#     {{
-#       "issue_id": 1,
-#       "highlight_text": "원문",
-#       "suggested_text": "AI 수정안 후보",
-#       "legal_basis": [],
-#       "revision_reason": "수정 이유"
-#     }}
-#   ],
-#   "follow_up_actions": []
-# }}
-# """
-
     prompt = f"""
 당신은 금융회사 법무팀 및 준법감시인을 지원하는
 FAQ Assistant다.
